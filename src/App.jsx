@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import {
   fetchLeads, createLead, updateLead, bulkCreateLeads,
   fetchFollowUps, createFollowUp, updateFollowUp, deleteFollowUp,
-  logCall,
+  logCall, supabase,
 } from "./lib/supabase.js";
 
 // ─── Normalize DB rows → UI shape ────────────────────────────────────────────
@@ -336,7 +336,7 @@ function CallCard({ call, onHangup, t, th, s }) {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-export default function CRM() {
+export default function CRM({ session }) {
   // ── Preferences ──
   const [dark, setDark] = useState(true);
   const [lang, setLang] = useState("es");
@@ -1375,6 +1375,17 @@ export default function CRM() {
             <span>{lang==="es"?"🇺🇸":"🇲🇽"}</span>
             <span>{lang==="es"?"Switch to English":"Cambiar a Español"}</span>
           </button>
+          {/* Logout */}
+          {session && (
+            <button onClick={()=>supabase.auth.signOut()}
+              style={{ display:"flex", alignItems:"center", gap:8, background:"transparent", border:`1px solid ${th.border}`,
+                borderRadius:7, padding:"7px 12px", cursor:"pointer", color:"#666", fontSize:12, fontWeight:500 }}>
+              <span>↪</span>
+              <span style={{ flex:1, textAlign:"left", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                {session.user?.email}
+              </span>
+            </button>
+          )}
         </div>
       </aside>
 
