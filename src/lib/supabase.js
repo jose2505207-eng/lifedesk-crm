@@ -96,3 +96,39 @@ export async function logCall({ leadId, outcome, durationSec, fromNumber }) {
   if (error) throw error
   return data
 }
+
+/**
+ * Fetch per-agent productivity metrics from the database.
+ *
+ * Calls the `dashboard_metrics` Postgres RPC which is scoped to the
+ * currently-authenticated agent via auth.uid().
+ *
+ * @param {Object} opts
+ * @param {'day'|'week'|'month'} opts.period - Time window to aggregate.
+ * @param {string} [opts.tz='America/Los_Angeles'] - IANA timezone for the window.
+ * @returns {Promise<{
+ *   period: string,
+ *   window_start: string,
+ *   summary: {
+ *     new_leads: number,
+ *     calls: number,
+ *     contacted_calls: number,
+ *     followups_created: number,
+ *     followups_done: number,
+ *     followups_pending: number,
+ *     followups_overdue: number,
+ *     closed_won: number,
+ *     premium_won: number,
+ *   },
+ *   series: Array<{date:string, new_leads:number, calls:number,
+ *                  followups_created:number, followups_done:number}>,
+ * }>}
+ */
+export async function fetchDashboardMetrics({ period = 'week', tz = 'America/Los_Angeles' } = {}) {
+  const { data, error } = await supabase.rpc('dashboard_metrics', {
+    p_period: period,
+    p_tz: tz,
+  })
+  if (error) throw error
+  return data
+}
