@@ -41,6 +41,17 @@ npm install
 2. Pega el contenido de `schema.sql`
 3. Clic en **Run** ✓
 
+### 3b. Aplicar migración de métricas de productividad
+
+Esta migración agrega la columna `done_at` a `follow_ups`, el trigger automático,
+y la función RPC `dashboard_metrics` usada por el Dashboard.
+
+1. En el dashboard de Supabase → **SQL Editor** → **New query**
+2. Pega el contenido de `supabase/migrations/001_done_at_and_metrics.sql`
+3. Clic en **Run** ✓
+
+> **Nota:** Aplica primero `schema.sql` y después la migración `001_…sql`.
+
 ### 4. Obtener las API keys
 
 1. En Supabase → **Settings** → **API**
@@ -73,6 +84,9 @@ Abre [http://localhost:5173](http://localhost:5173)
 ```
 lifedesk-crm/
 ├── schema.sql              ← Schema de Supabase (correr una vez)
+├── supabase/
+│   └── migrations/
+│       └── 001_done_at_and_metrics.sql  ← done_at + dashboard_metrics RPC
 ├── .env.example            ← Template de variables de entorno
 ├── .env                    ← Variables reales (NO subir a git)
 ├── package.json

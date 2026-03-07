@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import {
   fetchLeads, createLead, updateLead, bulkCreateLeads,
   fetchFollowUps, createFollowUp, updateFollowUp, deleteFollowUp,
-  logCall, supabase,
+  logCall, supabase, fetchDashboardMetrics,
 } from "./lib/supabase.js";
 
 // ─── Normalize DB rows → UI shape ────────────────────────────────────────────
@@ -20,6 +20,27 @@ const T = {
       closed:"Closed", pending:"Pending Tasks", monthly:"Monthly Premium",
       pipelineByStatus:"Pipeline by Status", upcomingFollowups:"Upcoming Follow-ups",
       noFollowups:"No pending follow-ups.", done:"Done",
+      // Productivity metrics dashboard
+      metrics:"Productivity Metrics",
+      periodDay:"Day", periodWeek:"Week", periodMonth:"Month",
+      newLeads:"New Leads", calls:"Calls", contactedCalls:"Contacted",
+      fuCreated:"Follow-ups Created", fuDone:"Follow-ups Done",
+      fuPending:"Pending Follow-ups", fuOverdue:"Overdue",
+      closedWon:"Closed Won", premiumWon:"Premium Won",
+      trendTitle:"Daily Trend",
+      metricsLoading:"Loading metrics…",
+      metricsError:"Could not load metrics.",
+      metricsUnavailable:"Sign in to view productivity metrics.",
+      // Metric descriptions (tooltip / subtitle)
+      descNewLeads:"Leads added in this period",
+      descCalls:"Calls logged in this period",
+      descContactedCalls:"Calls with outcome = contacted",
+      descFuCreated:"Follow-ups scheduled in this period",
+      descFuDone:"Follow-ups marked done in this period",
+      descFuPending:"Open follow-ups (all time)",
+      descFuOverdue:"Open follow-ups past their due date",
+      descClosedWon:"Deals closed (status updated in period)",
+      descPremiumWon:"Total monthly premium from closed deals",
     },
     leads: {
       title:"Leads", newLead:"New Lead", importCsv:"Import CSV",
@@ -99,6 +120,26 @@ const T = {
       closed:"Cerrados", pending:"Tareas Pendientes", monthly:"Prima Mensual",
       pipelineByStatus:"Pipeline por Status", upcomingFollowups:"Próximos Seguimientos",
       noFollowups:"Sin seguimientos pendientes.", done:"Listo",
+      // Métricas de productividad
+      metrics:"Métricas de Productividad",
+      periodDay:"Día", periodWeek:"Semana", periodMonth:"Mes",
+      newLeads:"Nuevos Leads", calls:"Llamadas", contactedCalls:"Contactados",
+      fuCreated:"Seguimientos Creados", fuDone:"Seguimientos Hechos",
+      fuPending:"Pendientes", fuOverdue:"Vencidos",
+      closedWon:"Cerrados Ganados", premiumWon:"Prima Ganada",
+      trendTitle:"Tendencia Diaria",
+      metricsLoading:"Cargando métricas…",
+      metricsError:"No se pudieron cargar las métricas.",
+      metricsUnavailable:"Inicia sesión para ver las métricas.",
+      descNewLeads:"Leads agregados en este período",
+      descCalls:"Llamadas registradas en este período",
+      descContactedCalls:"Llamadas con resultado = contactado",
+      descFuCreated:"Seguimientos agendados en este período",
+      descFuDone:"Seguimientos marcados como hechos",
+      descFuPending:"Seguimientos abiertos (todo el tiempo)",
+      descFuOverdue:"Seguimientos abiertos pasados su fecha",
+      descClosedWon:"Cierres con estado actualizado en período",
+      descPremiumWon:"Prima mensual total de cierres",
     },
     leads: {
       title:"Leads", newLead:"Nuevo Lead", importCsv:"Importar CSV",
@@ -358,6 +399,13 @@ export default function CRM({ session }) {
   const [loading, setLoading] = useState(true);
   const [dbError, setDbError] = useState("");
 
+  // ── Productivity metrics dashboard ──
+  const [dashPeriod, setDashPeriod]   = useState("week");
+  const [dashMetrics, setDashMetrics] = useState(null);
+  const [dashLoading, setDashLoading] = useState(false);
+  const [dashError, setDashError]     = useState("");
+  const DASH_TZ = "America/Los_Angeles";
+
   // Load data from Supabase on mount
   useEffect(() => {
     async function load() {
@@ -375,6 +423,27 @@ export default function CRM({ session }) {
     }
     load();
   }, []);
+
+  // Load productivity metrics whenever period or session changes
+  useEffect(() => {
+    if (!session) { setDashMetrics(null); return; }
+    let cancelled = false;
+    async function loadMetrics() {
+      setDashLoading(true);
+      setDashError("");
+      try {
+        const data = await fetchDashboardMetrics({ period: dashPeriod, tz: DASH_TZ });
+        if (!cancelled) setDashMetrics(data);
+      } catch (e) {
+        console.error(e);
+        if (!cancelled) setDashError(e.message || "Error");
+      } finally {
+        if (!cancelled) setDashLoading(false);
+      }
+    }
+    loadMetrics();
+    return () => { cancelled = true; };
+  }, [dashPeriod, session]);
 
   // ── Leads UI ──
   const [filterStatus, setFilterStatus] = useState("All");
@@ -637,6 +706,51 @@ export default function CRM({ session }) {
   const pendingFUDot = fus.filter(f=>!f.done).length;
 
   // ─── Section: Dashboard ───────────────────────────────────────────────────
+  // Helper: compute max value in series for a given key (for bar scaling)
+  function seriesMax(series, key) {
+    if (!series || series.length === 0) return 1;
+    return Math.max(1, ...series.map(d => d[key] || 0));
+  }
+
+  // Mini inline bar chart row
+  function TrendRow({ label, series, dataKey, color }) {
+    const max = seriesMax(series, dataKey);
+    return (
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 10, color: th.text3, fontWeight: 600, letterSpacing: "0.05em",
+          textTransform: "uppercase", marginBottom: 4 }}>{label}</div>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 32 }}>
+          {(series || []).map((d, i) => {
+            const h = max > 0 ? Math.round((d[dataKey] / max) * 32) : 0;
+            return (
+              <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column",
+                alignItems: "center", justifyContent: "flex-end", height: 32 }}
+                title={`${d.date}: ${d[dataKey]}`}>
+                <div style={{ width: "100%", height: Math.max(h, d[dataKey] > 0 ? 2 : 0),
+                  background: color, borderRadius: "2px 2px 0 0", opacity: 0.85,
+                  transition: "height .2s" }} />
+              </div>
+            );
+          })}
+        </div>
+        {/* Date labels: show first and last only (dates are ISO YYYY-MM-DD, slice(5) gives MM-DD) */}
+        {series && series.length > 1 && (
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 2 }}>
+            <span style={{ fontSize: 9, color: th.text3 }}>{series[0]?.date?.slice(5)}</span>
+            <span style={{ fontSize: 9, color: th.text3 }}>{series[series.length-1]?.date?.slice(5)}</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const sm = dashMetrics?.summary;
+  const periodLabels = {
+    day:   t.dash.periodDay,
+    week:  t.dash.periodWeek,
+    month: t.dash.periodMonth,
+  };
+
   const SectionDashboard = (
     <div>
       <h1 style={{ fontSize:22, fontWeight:700, color:th.text, marginBottom:24, letterSpacing:"-0.03em" }}>{t.dash.title}</h1>
@@ -655,6 +769,89 @@ export default function CRM({ session }) {
             <div style={{ fontSize:11, color:th.text3, marginTop:5, fontWeight:500, letterSpacing:"0.04em", textTransform:"uppercase" }}>{label}</div>
           </div>
         ))}
+      </div>
+
+      {/* ── Productivity Metrics ─────────────────────────────── */}
+      <div style={{ marginBottom: 28 }}>
+        {/* Header + period toggle */}
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
+          <div style={{ fontSize:11, fontWeight:600, color:th.text3, letterSpacing:"0.08em", textTransform:"uppercase" }}>
+            {t.dash.metrics}
+          </div>
+          <div style={{ display:"flex", gap:4 }}>
+            {["day","week","month"].map(p => (
+              <button key={p} onClick={() => setDashPeriod(p)}
+                style={{
+                  background: dashPeriod===p ? th.accent : "transparent",
+                  color: dashPeriod===p ? (dark ? "#0d0d0d" : "#fff") : th.text2,
+                  border: `1px solid ${dashPeriod===p ? th.accent : th.border}`,
+                  borderRadius: 20, padding:"3px 12px", fontSize:11,
+                  fontWeight:600, cursor:"pointer", fontFamily:"inherit", transition:"all .15s",
+                }}>
+                {periodLabels[p]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Loading / error / unavailable states */}
+        {!session && (
+          <div style={{ ...s.card, padding:"16px 18px", color:th.text3, fontSize:13 }}>
+            {t.dash.metricsUnavailable}
+          </div>
+        )}
+        {session && dashLoading && (
+          <div style={{ ...s.card, padding:"16px 18px", color:th.text3, fontSize:13 }}>
+            {t.dash.metricsLoading}
+          </div>
+        )}
+        {session && !dashLoading && dashError && (
+          <div style={{ background:th.dangerBg, border:`1px solid ${th.danger}`, borderRadius:10,
+            padding:"16px 18px", color:th.danger, fontSize:13 }}>
+            {t.dash.metricsError}
+          </div>
+        )}
+
+        {/* Metrics content */}
+        {session && !dashLoading && !dashError && sm && (
+          <div>
+            {/* Summary cards — 3 columns × 3 rows */}
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8, marginBottom:16 }}>
+              {[
+                { label:t.dash.newLeads,      val:sm.new_leads,         color:th.accent,  desc:t.dash.descNewLeads },
+                { label:t.dash.calls,         val:sm.calls,             color:"#60a5fa",  desc:t.dash.descCalls },
+                { label:t.dash.contactedCalls,val:sm.contacted_calls,   color:"#34d399",  desc:t.dash.descContactedCalls },
+                { label:t.dash.fuCreated,     val:sm.followups_created, color:"#a78bfa",  desc:t.dash.descFuCreated },
+                { label:t.dash.fuDone,        val:sm.followups_done,    color:th.accent,  desc:t.dash.descFuDone },
+                { label:t.dash.fuPending,     val:sm.followups_pending, color:"#fbbf24",  desc:t.dash.descFuPending },
+                { label:t.dash.fuOverdue,     val:sm.followups_overdue, color:th.danger,  desc:t.dash.descFuOverdue },
+                { label:t.dash.closedWon,     val:sm.closed_won,        color:th.accent,  desc:t.dash.descClosedWon },
+                { label:t.dash.premiumWon,    val:`$${sm.premium_won}`, color:th.accent,  desc:t.dash.descPremiumWon },
+              ].map(({ label, val, color, desc }) => (
+                <div key={label} style={{ ...s.card, padding:"14px 16px" }} title={desc}>
+                  <div style={{ fontSize:22, fontWeight:700, color, fontFamily:"'JetBrains Mono',monospace",
+                    letterSpacing:"-0.03em" }}>{val}</div>
+                  <div style={{ fontSize:10, color:th.text3, marginTop:4, fontWeight:600,
+                    letterSpacing:"0.04em", textTransform:"uppercase" }}>{label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Daily trend mini-bars */}
+            {dashMetrics.series && dashMetrics.series.length > 1 && (
+              <div style={{ ...s.card, padding:"16px 18px" }}>
+                <div style={{ fontSize:11, fontWeight:600, color:th.text3,
+                  letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:12 }}>
+                  {t.dash.trendTitle}
+                </div>
+                <TrendRow label={t.dash.newLeads}  series={dashMetrics.series} dataKey="new_leads"         color={th.accent} />
+                <TrendRow label={t.dash.calls}      series={dashMetrics.series} dataKey="calls"              color="#60a5fa" />
+                <TrendRow label={t.dash.fuCreated}  series={dashMetrics.series} dataKey="followups_created"  color="#a78bfa" />
+                <TrendRow label={t.dash.fuDone}     series={dashMetrics.series} dataKey="followups_done"     color="#34d399" />
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Pipeline */}
@@ -703,6 +900,7 @@ export default function CRM({ session }) {
       </div>
     </div>
   );
+
 
   // ─── Section: Leads list ──────────────────────────────────────────────────
   const SectionLeads = (
