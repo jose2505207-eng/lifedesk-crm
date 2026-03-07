@@ -27,6 +27,8 @@ const T = {
       fuCreated:"Follow-ups Created", fuDone:"Follow-ups Done",
       fuPending:"Pending Follow-ups", fuOverdue:"Overdue",
       closedWon:"Closed Won", premiumWon:"Premium Won",
+      dealsLost:"Deals Lost", pipelineValue:"Pipeline Value",
+      conversionRate:"Conversion Rate",
       trendTitle:"Daily Trend",
       metricsLoading:"Loading metrics…",
       metricsError:"Could not load metrics.",
@@ -41,6 +43,9 @@ const T = {
       descFuOverdue:"Open follow-ups past their due date",
       descClosedWon:"Deals closed (status updated in period)",
       descPremiumWon:"Total monthly premium from closed deals",
+      descDealsLost:"Deals closed lost in this period",
+      descPipelineValue:"Sum of premiums for all active pipeline leads",
+      descConversionRate:"% of all-time leads closed won (closed in period / total leads)",
     },
     leads: {
       title:"Leads", newLead:"New Lead", importCsv:"Import CSV",
@@ -744,7 +749,13 @@ export default function CRM({ session }) {
     );
   }
 
-  const sm = dashMetrics?.summary;
+  const DEFAULT_SUMMARY = {
+    new_leads: 0, calls: 0, contacted_calls: 0,
+    followups_created: 0, followups_done: 0, followups_pending: 0,
+    followups_overdue: 0, closed_won: 0, premium_won: 0,
+    pipeline_value: 0, deals_lost: 0, total_leads: 0, conversion_rate: 0,
+  };
+  const sm = dashMetrics?.summary ?? DEFAULT_SUMMARY;
   const periodLabels = {
     day:   t.dash.periodDay,
     week:  t.dash.periodWeek,
@@ -813,20 +824,23 @@ export default function CRM({ session }) {
         )}
 
         {/* Metrics content */}
-        {session && !dashLoading && !dashError && sm && (
+        {session && !dashLoading && !dashError && (
           <div>
-            {/* Summary cards — 3 columns × 3 rows */}
+            {/* Summary cards */}
             <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8, marginBottom:16 }}>
               {[
-                { label:t.dash.newLeads,      val:sm.new_leads,         color:th.accent,  desc:t.dash.descNewLeads },
-                { label:t.dash.calls,         val:sm.calls,             color:"#60a5fa",  desc:t.dash.descCalls },
-                { label:t.dash.contactedCalls,val:sm.contacted_calls,   color:"#34d399",  desc:t.dash.descContactedCalls },
-                { label:t.dash.fuCreated,     val:sm.followups_created, color:"#a78bfa",  desc:t.dash.descFuCreated },
-                { label:t.dash.fuDone,        val:sm.followups_done,    color:th.accent,  desc:t.dash.descFuDone },
-                { label:t.dash.fuPending,     val:sm.followups_pending, color:"#fbbf24",  desc:t.dash.descFuPending },
-                { label:t.dash.fuOverdue,     val:sm.followups_overdue, color:th.danger,  desc:t.dash.descFuOverdue },
-                { label:t.dash.closedWon,     val:sm.closed_won,        color:th.accent,  desc:t.dash.descClosedWon },
-                { label:t.dash.premiumWon,    val:`$${sm.premium_won}`, color:th.accent,  desc:t.dash.descPremiumWon },
+                { label:t.dash.newLeads,       val:sm.new_leads,                                      color:th.accent,  desc:t.dash.descNewLeads },
+                { label:t.dash.calls,          val:sm.calls,                                          color:"#60a5fa",  desc:t.dash.descCalls },
+                { label:t.dash.contactedCalls, val:sm.contacted_calls,                                color:"#34d399",  desc:t.dash.descContactedCalls },
+                { label:t.dash.fuCreated,      val:sm.followups_created,                              color:"#a78bfa",  desc:t.dash.descFuCreated },
+                { label:t.dash.fuDone,         val:sm.followups_done,                                 color:th.accent,  desc:t.dash.descFuDone },
+                { label:t.dash.fuPending,      val:sm.followups_pending,                              color:"#fbbf24",  desc:t.dash.descFuPending },
+                { label:t.dash.fuOverdue,      val:sm.followups_overdue,                              color:th.danger,  desc:t.dash.descFuOverdue },
+                { label:t.dash.closedWon,      val:sm.closed_won,                                     color:th.accent,  desc:t.dash.descClosedWon },
+                { label:t.dash.premiumWon,     val:`$${sm.premium_won ?? 0}`,                         color:th.accent,  desc:t.dash.descPremiumWon },
+                { label:t.dash.dealsLost,      val:sm.deals_lost ?? 0,                                color:th.danger,  desc:t.dash.descDealsLost },
+                { label:t.dash.pipelineValue,  val:`$${sm.pipeline_value ?? 0}`,                      color:"#60a5fa",  desc:t.dash.descPipelineValue },
+                { label:t.dash.conversionRate, val:`${sm.conversion_rate ?? 0}%`,                     color:"#34d399",  desc:t.dash.descConversionRate },
               ].map(({ label, val, color, desc }) => (
                 <div key={label} style={{ ...s.card, padding:"14px 16px" }} title={desc}>
                   <div style={{ fontSize:22, fontWeight:700, color, fontFamily:"'JetBrains Mono',monospace",
@@ -838,7 +852,7 @@ export default function CRM({ session }) {
             </div>
 
             {/* Daily trend mini-bars */}
-            {dashMetrics.series && dashMetrics.series.length > 1 && (
+            {dashMetrics?.series && dashMetrics.series.length > 1 && (
               <div style={{ ...s.card, padding:"16px 18px" }}>
                 <div style={{ fontSize:11, fontWeight:600, color:th.text3,
                   letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:12 }}>
