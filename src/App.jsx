@@ -31,9 +31,11 @@ const T = {
       productLbl:"Product", notesLbl:"Notes", cancel:"Cancel", save:"Save",
       detail: { back:"← Back", product:"Product", premium:"Mo. Premium",
         lastContact:"Last Contact", notes:"Notes", noNotes:"No notes yet.",
-        updateNotes:"Update notes…", saveNote:"Save Note",
+        updateNotes:"Update notes…", saveNote:"Save Note", saveInfo:"Save",
         changeStatus:"Change Status", followups:"Follow-ups", add:"+ Add", noFU:"No follow-ups.",
       },
+      timeFilter:"Last contact", allTime:"All time", yesterday:"Yesterday",
+      last3days:"3+ days ago", lastWeek:"1 week ago", lastMonth:"1 month ago",
     },
     pipeline: {
       title:"Pipeline", leadsIn:"leads in", moveToNext:"Move to next stage",
@@ -108,9 +110,11 @@ const T = {
       productLbl:"Producto", notesLbl:"Notas", cancel:"Cancelar", save:"Guardar",
       detail: { back:"← Volver", product:"Producto", premium:"Prima/mes",
         lastContact:"Último contacto", notes:"Notas", noNotes:"Sin notas.",
-        updateNotes:"Actualizar notas…", saveNote:"Guardar Nota",
+        updateNotes:"Actualizar notas…", saveNote:"Guardar Nota", saveInfo:"Guardar",
         changeStatus:"Cambiar Status", followups:"Seguimientos", add:"+ Agregar", noFU:"Sin seguimientos.",
       },
+      timeFilter:"Último contacto", allTime:"Todo", yesterday:"Ayer",
+      last3days:"Más de 3 días", lastWeek:"1 semana", lastMonth:"1 mes",
     },
     pipeline: {
       title:"Pipeline", leadsIn:"leads en", moveToNext:"Mover a siguiente etapa",
@@ -374,9 +378,13 @@ export default function CRM({ session }) {
 
   // ── Leads UI ──
   const [filterStatus, setFilterStatus] = useState("All");
+  const [filterTime, setFilterTime]     = useState("All");
   const [search, setSearch]             = useState("");
   const [showAddLead, setShowAddLead]   = useState(false);
   const [editNote, setEditNote]         = useState("");
+  const [editProduct, setEditProduct]   = useState("");
+  const [editPremium, setEditPremium]   = useState(0);
+  const [editLastContact, setEditLastContact] = useState("");
   const [newLead, setNewLead]           = useState({ name:"",phone:"",email:"",status:"New Lead",product:"Term Life",age:"",city:"",notes:"" });
 
   // ── Follow-ups UI ──
@@ -407,8 +415,18 @@ export default function CRM({ session }) {
   const filtLeads = useMemo(()=>leads.filter(l=>{
     const ms = filterStatus==="All"||l.status===filterStatus;
     const mq = !search||l.name.toLowerCase().includes(search.toLowerCase())||l.phone.includes(search)||l.city.toLowerCase().includes(search.toLowerCase());
-    return ms&&mq;
-  }),[leads,filterStatus,search]);
+    let mt = true;
+    if (filterTime!=="All" && l.lastContact) {
+      const today = new Date(); today.setHours(0,0,0,0);
+      const lc = new Date(l.lastContact+"T00:00:00");
+      const diffDays = (today - lc) / 86400000;
+      if (filterTime==="yesterday") mt = diffDays>=1 && diffDays<2;
+      else if (filterTime==="3days")  mt = diffDays>=3;
+      else if (filterTime==="1week")  mt = diffDays>=7;
+      else if (filterTime==="1month") mt = diffDays>=30;
+    }
+    return ms&&mq&&mt;
+  }),[leads,filterStatus,filterTime,search]);
 
   const mtLeads = useMemo(()=>mtFilter==="All"?leads:leads.filter(l=>l.status===mtFilter),[leads,mtFilter]);
 
@@ -502,6 +520,23 @@ export default function CRM({ session }) {
     setSelectedLead(p=>({...p,notes:editNote}));
     try { await updateLead(id,{notes:editNote}); }
     catch(e){ console.error(e); }
+  }
+  async function saveLeadInfo(id){
+    const premium = parseFloat(editPremium);
+    const premiumVal = isNaN(premium) ? 0 : premium;
+    const lastContact = editLastContact;
+    setLeads(p=>p.map(l=>l.id===id?{...l,product:editProduct,premium:premiumVal,lastContact}:l)); // optimistic
+    setSelectedLead(p=>({...p,product:editProduct,premium:premiumVal,lastContact}));
+    try { await updateLead(id,{product:editProduct,premium:premiumVal,last_contact:lastContact}); }
+    catch(e){ console.error(e); }
+  }
+  function openLeadDetail(l){
+    setSelectedLead(l);
+    setEditNote(l.notes);
+    setEditProduct(l.product||"");
+    setEditPremium(l.premium||0);
+    setEditLastContact(l.lastContact||"");
+    setView("leadDetail");
   }
 
   // ── Follow-up helpers ─────────────────────────────────────────────────────
@@ -631,7 +666,11 @@ export default function CRM({ session }) {
             const pct=leads.length?count/leads.length:0;
             return (
               <div key={st} style={{ display:"flex", alignItems:"center", gap:14, padding:"11px 18px",
-                borderBottom:i<STATUSES.length-1?`1px solid ${th.border}`:"none" }}>
+                borderBottom:i<STATUSES.length-1?`1px solid ${th.border}`:"none",
+                cursor:"pointer" }}
+                onClick={()=>{ setFilterStatus(st); setView("leads"); }}
+                onMouseEnter={e=>e.currentTarget.style.background=th.s2}
+                onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                 <StatusDot status={st} size={6} />
                 <span style={{ fontSize:13, color:th.text2, flex:1, fontWeight:500 }}>{t.status[st]||st}</span>
                 <div style={{ width:120, height:4, background:th.s3, borderRadius:2, overflow:"hidden" }}>
@@ -682,7 +721,7 @@ export default function CRM({ session }) {
 
       {csvErr&&<div style={{ background:th.dangerBg, color:th.danger, borderRadius:7, padding:"8px 12px", marginBottom:12, fontSize:12 }}>{csvErr}</div>}
 
-      <div style={{ display:"flex", gap:8, marginBottom:16 }}>
+      <div style={{ display:"flex", gap:8, marginBottom:10 }}>
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder={t.leads.search}
           style={{ ...s.inp, maxWidth:300, flex:1 }} />
         <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)}
@@ -692,18 +731,34 @@ export default function CRM({ session }) {
         </select>
       </div>
 
+      {/* Time-based filter chips */}
+      <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:16, flexWrap:"wrap" }}>
+        <span style={{ fontSize:11, color:th.text3, fontWeight:600, letterSpacing:"0.06em", textTransform:"uppercase", marginRight:4 }}>{t.leads.timeFilter}:</span>
+        {[["All",t.leads.allTime],["yesterday",t.leads.yesterday],["3days",t.leads.last3days],["1week",t.leads.lastWeek],["1month",t.leads.lastMonth]].map(([val,label])=>(
+          <button key={val} onClick={()=>setFilterTime(val)}
+            style={{ background:filterTime===val?th.accent:"transparent",
+              color:filterTime===val?(th.bg==="0d0d0d"||th.bg==="#0d0d0d"?"#0d0d0d":"#fff"):th.text2,
+              border:`1px solid ${filterTime===val?th.accent:th.border}`,
+              borderRadius:20, padding:"4px 12px", fontSize:12, fontWeight:500,
+              cursor:"pointer", fontFamily:"inherit", transition:"all .15s" }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
       <div style={{ ...s.card, overflow:"hidden" }}>
         <table style={{ width:"100%", borderCollapse:"collapse" }}>
           <thead>
             <tr style={{ borderBottom:`1px solid ${th.border}` }}>
-              {[t.leads.name,t.leads.phone,t.leads.city,t.leads.product,t.leads.status,t.leads.lastContact,""].map(h=>(
+              {[t.leads.name,t.leads.phone,t.leads.city,t.leads.product,t.leads.status,t.leads.lastContact].map(h=>(
                 <th key={h} style={{ padding:"10px 16px", textAlign:"left", fontSize:10, fontWeight:700, color:th.text3, letterSpacing:"0.08em", textTransform:"uppercase" }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {filtLeads.map((l,i)=>(
-              <tr key={l.id} style={{ borderBottom:i<filtLeads.length-1?`1px solid ${th.border}`:"none", cursor:"default" }}
+              <tr key={l.id} style={{ borderBottom:i<filtLeads.length-1?`1px solid ${th.border}`:"none", cursor:"pointer" }}
+                onClick={()=>openLeadDetail(l)}
                 onMouseEnter={e=>e.currentTarget.style.background=th.s2}
                 onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                 <td style={{ padding:"11px 16px" }}>
@@ -717,13 +772,10 @@ export default function CRM({ session }) {
                   <StatusDot status={l.status} label={<span style={{ fontSize:12, color:th.text2 }}>{t.status[l.status]||l.status}</span>} />
                 </td>
                 <td style={{ padding:"11px 16px", fontSize:12, color:th.text3, fontFamily:"'JetBrains Mono',monospace" }}>{l.lastContact}</td>
-                <td style={{ padding:"11px 16px" }}>
-                  <button onClick={()=>{setSelectedLead(l);setEditNote(l.notes);setView("leadDetail");}} style={s.btnGhost}>→</button>
-                </td>
               </tr>
             ))}
             {filtLeads.length===0&&(
-              <tr><td colSpan={7} style={{ padding:32, textAlign:"center", color:th.text3, fontSize:13 }}>{t.leads.noLeads}</td></tr>
+              <tr><td colSpan={6} style={{ padding:32, textAlign:"center", color:th.text3, fontSize:13 }}>{t.leads.noLeads}</td></tr>
             )}
           </tbody>
         </table>
@@ -746,14 +798,26 @@ export default function CRM({ session }) {
               </div>
               <StatusDot status={selectedLead.status} label={<span style={{ fontSize:13, color:th.text2, fontWeight:600 }}>{t.status[selectedLead.status]||selectedLead.status}</span>} />
             </div>
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10 }}>
-              {[[t.leads.detail.product,selectedLead.product],[t.leads.detail.premium,selectedLead.premium?`$${selectedLead.premium}`:"—"],[t.leads.detail.lastContact,selectedLead.lastContact]].map(([k,v])=>(
-                <div key={k} style={{ background:th.s2, borderRadius:8, padding:"10px 12px" }}>
-                  <div style={{ fontSize:10, color:th.text3, fontWeight:600, letterSpacing:"0.06em", textTransform:"uppercase", marginBottom:3 }}>{k}</div>
-                  <div style={{ fontSize:14, fontWeight:700, color:th.text, fontFamily:k===t.leads.detail.premium||k===t.leads.detail.lastContact?"'JetBrains Mono',monospace":"inherit" }}>{v}</div>
-                </div>
-              ))}
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10, marginBottom:12 }}>
+              <div style={{ background:th.s2, borderRadius:8, padding:"10px 12px" }}>
+                <div style={{ fontSize:10, color:th.text3, fontWeight:600, letterSpacing:"0.06em", textTransform:"uppercase", marginBottom:5 }}>{t.leads.detail.product}</div>
+                <select value={editProduct} onChange={e=>setEditProduct(e.target.value)}
+                  style={{ ...s.inp, background:"transparent", border:"none", padding:"2px 0", fontSize:13, fontWeight:700, color:th.text }}>
+                  {t.products.map(p=><option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+              <div style={{ background:th.s2, borderRadius:8, padding:"10px 12px" }}>
+                <div style={{ fontSize:10, color:th.text3, fontWeight:600, letterSpacing:"0.06em", textTransform:"uppercase", marginBottom:5 }}>{t.leads.detail.premium}</div>
+                <input type="number" min="0" step="1" value={editPremium} onChange={e=>setEditPremium(e.target.value===""?"":parseFloat(e.target.value)||0)}
+                  style={{ ...s.inp, background:"transparent", border:"none", padding:"2px 0", fontSize:13, fontWeight:700, color:th.text, fontFamily:"'JetBrains Mono',monospace" }} />
+              </div>
+              <div style={{ background:th.s2, borderRadius:8, padding:"10px 12px" }}>
+                <div style={{ fontSize:10, color:th.text3, fontWeight:600, letterSpacing:"0.06em", textTransform:"uppercase", marginBottom:5 }}>{t.leads.detail.lastContact}</div>
+                <input type="date" value={editLastContact} onChange={e=>setEditLastContact(e.target.value)}
+                  style={{ ...s.inp, background:"transparent", border:"none", padding:"2px 0", fontSize:13, fontWeight:700, color:th.text, fontFamily:"'JetBrains Mono',monospace" }} />
+              </div>
             </div>
+            <button onClick={()=>saveLeadInfo(selectedLead.id)} style={s.btnSm}>{t.leads.detail.saveInfo}</button>
           </div>
           <div style={{ ...s.card, padding:22 }}>
             <div style={{ fontSize:11, color:th.text3, fontWeight:600, letterSpacing:"0.06em", textTransform:"uppercase", marginBottom:10 }}>{t.leads.detail.notes}</div>
@@ -816,8 +880,7 @@ export default function CRM({ session }) {
               </div>
               {stLeads.map(l=>(
                 <div key={l.id} style={{ ...s.card, padding:"12px 12px", marginBottom:8, cursor:"pointer" }}
-                  onClick={()=>{setSelectedLead(l);setEditNote(l.notes);setView("leadDetail");}}>
-                  <div style={{ fontWeight:600, fontSize:12, color:th.text, marginBottom:3 }}>{l.name}</div>
+                  onClick={()=>openLeadDetail(l)}>                  <div style={{ fontWeight:600, fontSize:12, color:th.text, marginBottom:3 }}>{l.name}</div>
                   <div style={{ fontSize:11, color:th.text3, fontFamily:"'JetBrains Mono',monospace", marginBottom:5 }}>{l.phone}</div>
                   <div style={{ fontSize:10, color:th.text3, background:th.s2, display:"inline-block", padding:"2px 7px", borderRadius:20 }}>{l.product}</div>
                   {l.premium>0&&<div style={{ fontSize:11, color:th.accent, marginTop:5, fontFamily:"'JetBrains Mono',monospace" }}>${l.premium}/mo</div>}
