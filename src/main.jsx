@@ -3,34 +3,43 @@ import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import AuthScreen from './AuthScreen.jsx'
 import { supabase } from './lib/supabase.js'
+import './index.css'
 
 function Root() {
-  const [session, setSession] = useState(undefined)
+  const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
+      setUser(session?.user ?? null)
+      setLoading(false)
     })
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
+      setUser(session?.user ?? null)
     })
+
     return () => subscription.unsubscribe()
   }, [])
 
-  if (session === undefined) {
+  if (loading) {
     return (
-      <div style={{ minHeight:'100vh', background:'#0d0d0d', display:'flex', alignItems:'center', justifyContent:'center' }}>
-        <div style={{ width:'28px', height:'28px', border:'2px solid #333', borderTop:'2px solid #22c55e', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
-        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        height: '100vh', backgroundColor: '#f9fafb',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        color: '#9ca3af', fontSize: 14
+      }}>
+        Cargando...
       </div>
     )
   }
 
-  if (!session) return <AuthScreen onAuth={() => {}} />
-
-  return <App session={session} />
+  return user ? <App user={user} /> : <AuthScreen />
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode><Root /></React.StrictMode>
+  <React.StrictMode>
+    <Root />
+  </React.StrictMode>
 )

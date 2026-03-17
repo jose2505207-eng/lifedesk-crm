@@ -1,254 +1,287 @@
-// AuthScreen.jsx — Pantalla de login / sign up para LifeDesk
 import { useState } from 'react'
-import { supabase } from './lib/supabase'
+import { supabase } from './lib/supabase.js'
 
-export default function AuthScreen({ onAuth }) {
-  const [mode, setMode]       = useState('login')   // 'login' | 'signup' | 'reset'
-  const [email, setEmail]     = useState('')
-  const [password, setPass]   = useState('')
-  const [loading, setLoading] = useState(false)
-  const [msg, setMsg]         = useState(null)       // { type: 'error'|'ok', text }
-  const [lang, setLang]       = useState('es')
-
-  const t = {
-    es: {
-      title:        'LifeDesk',
-      sub:          'CRM para agentes de seguros de vida',
-      email:        'Correo electrónico',
-      password:     'Contraseña',
-      login:        'Iniciar sesión',
-      signup:       'Crear cuenta',
-      reset:        'Recuperar contraseña',
-      noAccount:    '¿No tienes cuenta?',
-      hasAccount:   '¿Ya tienes cuenta?',
-      forgotPass:   '¿Olvidaste tu contraseña?',
-      backToLogin:  'Volver al inicio de sesión',
-      sendReset:    'Enviar enlace de recuperación',
-      resetSent:    'Revisa tu correo para el enlace de recuperación.',
-      signupOk:     'Cuenta creada. Revisa tu correo para confirmar.',
-      errRequired:  'Correo y contraseña son requeridos.',
-      errEmail:     'Ingresa un correo válido.',
-      errShortPass: 'La contraseña debe tener al menos 6 caracteres.',
-    },
-    en: {
-      title:        'LifeDesk',
-      sub:          'CRM for life insurance agents',
-      email:        'Email address',
-      password:     'Password',
-      login:        'Sign in',
-      signup:       'Create account',
-      reset:        'Reset password',
-      noAccount:    "Don't have an account?",
-      hasAccount:   'Already have an account?',
-      forgotPass:   'Forgot your password?',
-      backToLogin:  'Back to sign in',
-      sendReset:    'Send reset link',
-      resetSent:    'Check your email for the reset link.',
-      signupOk:     'Account created. Check your email to confirm.',
-      errRequired:  'Email and password are required.',
-      errEmail:     'Enter a valid email address.',
-      errShortPass: 'Password must be at least 6 characters.',
-    }
+const T = {
+  en: {
+    login: 'Sign In', signup: 'Create Account', reset: 'Reset Password',
+    email: 'Email', password: 'Password', confirmPassword: 'Confirm Password',
+    loginBtn: 'Sign In', signupBtn: 'Create Account', resetBtn: 'Send Reset Email',
+    noAccount: "Don't have an account?", hasAccount: 'Already have an account?',
+    forgotPassword: 'Forgot password?', backToLogin: 'Back to sign in',
+    resetSent: 'Check your email for the reset link.',
+    passwordMismatch: 'Passwords do not match.',
+    tagline: 'CRM for life insurance agents',
+  },
+  es: {
+    login: 'Iniciar Sesión', signup: 'Crear Cuenta', reset: 'Restablecer Contraseña',
+    email: 'Correo electrónico', password: 'Contraseña', confirmPassword: 'Confirmar Contraseña',
+    loginBtn: 'Iniciar Sesión', signupBtn: 'Crear Cuenta', resetBtn: 'Enviar Correo',
+    noAccount: '¿No tienes cuenta?', hasAccount: '¿Ya tienes cuenta?',
+    forgotPassword: '¿Olvidaste tu contraseña?', backToLogin: 'Volver al inicio',
+    resetSent: 'Revisa tu correo para el enlace de restablecimiento.',
+    passwordMismatch: 'Las contraseñas no coinciden.',
+    tagline: 'CRM para agentes de seguros de vida',
   }
-  const tx = t[lang]
+}
 
-  async function handleSubmit() {
-    setMsg(null)
+export default function AuthScreen() {
+  const [mode, setMode] = useState('login') // 'login' | 'signup' | 'reset'
+  const [lang, setLang] = useState('es')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
+  const [loading, setLoading] = useState(false)
 
-    if (mode === 'reset') {
-      if (!email) return setMsg({ type: 'error', text: tx.errEmail })
-      setLoading(true)
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin,
-      })
-      setLoading(false)
-      if (error) return setMsg({ type: 'error', text: error.message })
-      return setMsg({ type: 'ok', text: tx.resetSent })
-    }
+  const t = T[lang]
 
-    if (!email || !password) return setMsg({ type: 'error', text: tx.errRequired })
-    if (!email.includes('@'))  return setMsg({ type: 'error', text: tx.errEmail })
-    if (password.length < 6)   return setMsg({ type: 'error', text: tx.errShortPass })
-
+  const handleSubmit = async () => {
+    setError('')
+    setMessage('')
     setLoading(true)
 
-    if (mode === 'signup') {
-      const { error } = await supabase.auth.signUp({ email, password })
+    if (mode === 'signup' && password !== confirmPassword) {
+      setError(t.passwordMismatch)
       setLoading(false)
-      if (error) return setMsg({ type: 'error', text: error.message })
-      return setMsg({ type: 'ok', text: tx.signupOk })
+      return
     }
 
-    // login
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    let result
+    if (mode === 'login') {
+      result = await supabase.auth.signInWithPassword({ email, password })
+    } else if (mode === 'signup') {
+      result = await supabase.auth.signUp({ email, password })
+    } else {
+      result = await supabase.auth.resetPasswordForEmail(email)
+      if (!result.error) setMessage(t.resetSent)
+    }
+
+    if (result.error) setError(result.error.message)
     setLoading(false)
-    if (error) return setMsg({ type: 'error', text: error.message })
-    onAuth()
   }
 
-  // ─── Styles ───────────────────────────────────────────────
-  const s = {
-    wrap: {
-      minHeight: '100vh',
-      background: '#0d0d0d',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      fontFamily: "'Instrument Sans', system-ui, sans-serif",
-      padding: '24px',
-    },
-    card: {
-      background: '#161616',
-      border: '1px solid #222',
-      borderRadius: '12px',
-      padding: '40px',
-      width: '100%',
-      maxWidth: '380px',
-    },
-    logo: {
-      fontSize: '24px',
-      fontWeight: '700',
-      color: '#fff',
-      marginBottom: '4px',
-      letterSpacing: '-0.5px',
-    },
-    sub: {
-      fontSize: '13px',
-      color: '#555',
-      marginBottom: '32px',
-    },
-    label: {
-      display: 'block',
-      fontSize: '12px',
-      color: '#888',
-      marginBottom: '6px',
-      letterSpacing: '0.3px',
-    },
-    input: {
-      width: '100%',
-      background: '#1a1a1a',
-      border: '1px solid #2a2a2a',
-      borderRadius: '7px',
-      padding: '10px 12px',
-      color: '#e8e8e8',
-      fontSize: '14px',
-      outline: 'none',
-      boxSizing: 'border-box',
-      marginBottom: '16px',
-      transition: 'border-color 0.15s',
-    },
-    btn: {
-      width: '100%',
-      background: '#22c55e',
-      color: '#000',
-      border: 'none',
-      borderRadius: '7px',
-      padding: '11px',
-      fontWeight: '600',
-      fontSize: '14px',
-      cursor: loading ? 'not-allowed' : 'pointer',
-      opacity: loading ? 0.7 : 1,
-      marginBottom: '20px',
-      transition: 'opacity 0.15s',
-    },
-    link: {
-      background: 'none',
-      border: 'none',
-      color: '#22c55e',
-      cursor: 'pointer',
-      fontSize: '13px',
-      padding: '0',
-      textDecoration: 'underline',
-    },
-    row: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      fontSize: '13px',
-      color: '#555',
-    },
-    alert: (type) => ({
-      padding: '10px 12px',
-      borderRadius: '7px',
-      fontSize: '13px',
-      marginBottom: '16px',
-      background: type === 'error' ? '#2a1515' : '#152a1e',
-      color: type === 'error' ? '#f87171' : '#4ade80',
-      border: `1px solid ${type === 'error' ? '#3f1f1f' : '#1f3f2a'}`,
-    }),
-    langToggle: {
-      position: 'absolute',
-      top: '20px',
-      right: '20px',
-      background: 'none',
-      border: '1px solid #333',
-      borderRadius: '6px',
-      color: '#666',
-      fontSize: '12px',
-      padding: '4px 10px',
-      cursor: 'pointer',
-    },
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') handleSubmit()
   }
 
   return (
-    <div style={s.wrap}>
-      <button style={s.langToggle} onClick={() => setLang(l => l === 'es' ? 'en' : 'es')}>
-        {lang === 'es' ? '🇺🇸 EN' : '🇲🇽 ES'}
-      </button>
-
+    <div style={s.root}>
       <div style={s.card}>
-        <div style={s.logo}>{tx.title}</div>
-        <div style={s.sub}>{tx.sub}</div>
+        {/* Lang toggle */}
+        <div style={s.langRow}>
+          <button style={{ ...s.langBtn, ...(lang === 'es' ? s.langActive : {}) }} onClick={() => setLang('es')}>ES</button>
+          <button style={{ ...s.langBtn, ...(lang === 'en' ? s.langActive : {}) }} onClick={() => setLang('en')}>EN</button>
+        </div>
 
-        {msg && <div style={s.alert(msg.type)}>{msg.text}</div>}
+        {/* Logo */}
+        <div style={s.logo}>LD</div>
+        <h1 style={s.title}>LifeDesk</h1>
+        <p style={s.subtitle}>{t.tagline}</p>
 
-        {/* Email */}
-        <label style={s.label}>{tx.email}</label>
-        <input
-          type="email"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-          placeholder="agent@example.com"
-          style={s.input}
-          autoFocus
-        />
-
-        {/* Password (hidden in reset mode) */}
-        {mode !== 'reset' && (
-          <>
-            <label style={s.label}>{tx.password}</label>
+        {/* Form */}
+        <div style={s.form}>
+          <div style={s.formGroup}>
+            <label style={s.label}>{t.email}</label>
             <input
-              type="password"
-              value={password}
-              onChange={e => setPass(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-              placeholder="••••••••"
               style={s.input}
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="nombre@correo.com"
             />
-          </>
-        )}
+          </div>
 
-        <button style={s.btn} onClick={handleSubmit} disabled={loading}>
-          {loading ? '...' : mode === 'login' ? tx.login : mode === 'signup' ? tx.signup : tx.sendReset}
-        </button>
+          {mode !== 'reset' && (
+            <div style={s.formGroup}>
+              <label style={s.label}>{t.password}</label>
+              <input
+                style={s.input}
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                onKeyDown={handleKeyDown}
+              />
+            </div>
+          )}
 
-        <div style={s.row}>
+          {mode === 'signup' && (
+            <div style={s.formGroup}>
+              <label style={s.label}>{t.confirmPassword}</label>
+              <input
+                style={s.input}
+                type="password"
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                onKeyDown={handleKeyDown}
+              />
+            </div>
+          )}
+
+          {error && <div style={s.error}>{error}</div>}
+          {message && <div style={s.success}>{message}</div>}
+
+          <button style={s.submitBtn} onClick={handleSubmit} disabled={loading}>
+            {loading ? '...' : mode === 'login' ? t.loginBtn : mode === 'signup' ? t.signupBtn : t.resetBtn}
+          </button>
+        </div>
+
+        {/* Links */}
+        <div style={s.links}>
           {mode === 'login' && (
             <>
-              <span>{tx.noAccount} <button style={s.link} onClick={() => { setMode('signup'); setMsg(null) }}>{tx.signup}</button></span>
-              <button style={s.link} onClick={() => { setMode('reset'); setMsg(null) }}>{tx.forgotPass}</button>
+              <button style={s.link} onClick={() => { setMode('signup'); setError('') }}>{t.noAccount}</button>
+              <button style={s.link} onClick={() => { setMode('reset'); setError('') }}>{t.forgotPassword}</button>
             </>
           )}
           {mode === 'signup' && (
-            <span>{tx.hasAccount} <button style={s.link} onClick={() => { setMode('login'); setMsg(null) }}>{tx.login}</button></span>
+            <button style={s.link} onClick={() => { setMode('login'); setError('') }}>{t.hasAccount}</button>
           )}
           {mode === 'reset' && (
-            <button style={s.link} onClick={() => { setMode('login'); setMsg(null) }}>{tx.backToLogin}</button>
+            <button style={s.link} onClick={() => { setMode('login'); setError(''); setMessage('') }}>{t.backToLogin}</button>
           )}
         </div>
       </div>
     </div>
   )
+}
+
+const s = {
+  root: {
+    minHeight: '100vh',
+    backgroundColor: '#f9fafb',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    padding: 16,
+  },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: '40px 36px',
+    width: '100%',
+    maxWidth: 400,
+    border: '1px solid #e5e7eb',
+    boxShadow: '0 4px 24px rgba(0,0,0,0.06)',
+    position: 'relative',
+  },
+  langRow: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    display: 'flex',
+    gap: 4,
+  },
+  langBtn: {
+    padding: '4px 8px',
+    border: '1px solid #e5e7eb',
+    borderRadius: 6,
+    background: 'none',
+    cursor: 'pointer',
+    fontSize: 12,
+    color: '#9ca3af',
+    fontWeight: 500,
+  },
+  langActive: {
+    backgroundColor: '#111827',
+    color: '#fff',
+    borderColor: '#111827',
+  },
+  logo: {
+    width: 48,
+    height: 48,
+    backgroundColor: '#111827',
+    color: '#fff',
+    borderRadius: 12,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontWeight: 700,
+    fontSize: 16,
+    margin: '0 auto 14px',
+  },
+  title: {
+    textAlign: 'center',
+    fontSize: 22,
+    fontWeight: 700,
+    margin: '0 0 4px',
+  },
+  subtitle: {
+    textAlign: 'center',
+    color: '#9ca3af',
+    fontSize: 13,
+    margin: '0 0 28px',
+  },
+  form: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 14,
+  },
+  formGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: 600,
+    color: '#374151',
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+  },
+  input: {
+    padding: '9px 12px',
+    border: '1px solid #e5e7eb',
+    borderRadius: 8,
+    fontSize: 14,
+    outline: 'none',
+    width: '100%',
+    boxSizing: 'border-box',
+    fontFamily: 'inherit',
+    backgroundColor: '#f9fafb',
+  },
+  submitBtn: {
+    padding: '11px 0',
+    backgroundColor: '#111827',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 8,
+    fontSize: 15,
+    fontWeight: 500,
+    cursor: 'pointer',
+    marginTop: 4,
+  },
+  error: {
+    padding: '8px 12px',
+    backgroundColor: '#fef2f2',
+    border: '1px solid #fecaca',
+    borderRadius: 8,
+    color: '#dc2626',
+    fontSize: 13,
+  },
+  success: {
+    padding: '8px 12px',
+    backgroundColor: '#f0fdf4',
+    border: '1px solid #bbf7d0',
+    borderRadius: 8,
+    color: '#16a34a',
+    fontSize: 13,
+  },
+  links: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 20,
+  },
+  link: {
+    background: 'none',
+    border: 'none',
+    color: '#6b7280',
+    fontSize: 13,
+    cursor: 'pointer',
+    textDecoration: 'underline',
+  },
 }
