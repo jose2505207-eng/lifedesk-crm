@@ -3,7 +3,6 @@ import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import AuthScreen from './AuthScreen.jsx'
 import { supabase } from './lib/supabase.js'
-import './index.css'
 
 function Root() {
   const [user, setUser] = useState(null)
