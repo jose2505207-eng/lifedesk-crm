@@ -857,7 +857,7 @@ export default function CRM({ session }) {
             <div style={{ fontSize:11, color:th.text3, fontWeight:600, letterSpacing:"0.06em", textTransform:"uppercase", marginBottom:14 }}>{t.leads.detail.changeStatus}</div>
             {STATUSES.map(st=>(
               <button key={st} onClick={()=>setLeadStatus(selectedLead.id,st)}
-                style={{ display:"flex", alignItems:"center", gap:8, width:"100%", background:"transparent",
+                style={{ display:"flex", alignItems:"center", gap:8, width:"100%",
                   border:"none", padding:"8px 6px", cursor:"pointer", borderRadius:6,
                   background:selectedLead.status===st?th.s2:"transparent" }}
                 onMouseEnter={e=>e.currentTarget.style.background=th.s2}
