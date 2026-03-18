@@ -710,13 +710,14 @@ export default function CRM({ session }) {
         {fus.filter(f=>!f.done).slice(0,4).map(f=>{
           const lead=leads.find(l=>l.id===f.leadId);
           return (
-            <div key={f.id} style={{ ...s.card, padding:"12px 16px", marginBottom:8, display:"flex", alignItems:"center", gap:14 }}>
+            <div key={f.id} style={{ ...s.card, padding:"12px 16px", marginBottom:8, display:"flex", alignItems:"center", gap:14, cursor:"pointer" }}
+              onClick={()=>{ if(lead){ setSelectedLead(lead); setEditNote(lead.notes); setView("leadDetail"); } }}>
               <div style={{ flex:1 }}>
                 <span style={{ fontWeight:600, color:th.text, fontSize:13 }}>{lead?.name}</span>
                 <span style={{ color:th.text3, fontSize:12, marginLeft:8, fontFamily:"'JetBrains Mono',monospace" }}>{f.date}</span>
                 <div style={{ color:th.text2, fontSize:12, marginTop:3 }}>{f.note}</div>
               </div>
-              <button onClick={()=>toggleFU(f.id)} style={{ ...s.btnGhost }}>{t.dash.done}</button>
+              <button onClick={e=>{ e.stopPropagation(); toggleFU(f.id); }} style={{ ...s.btnGhost }}>{t.dash.done}</button>
             </div>
           );
         })}
@@ -967,8 +968,9 @@ export default function CRM({ session }) {
     return (
       <div style={{ ...s.card, marginBottom:8, overflow:"hidden", opacity: dimmed&&!isEditing ? 0.55 : 1 }}>
         {/* Row */}
-        <div style={{ padding:"13px 16px", display:"flex", alignItems:"flex-start", gap:12 }}>
-          <button onClick={()=>toggleFU(f.id)}
+        <div style={{ padding:"13px 16px", display:"flex", alignItems:"flex-start", gap:12, cursor:"pointer" }}
+          onClick={()=>{ if(lead){ setSelectedLead(lead); setEditNote(lead.notes); setView("leadDetail"); } }}>
+          <button onClick={e=>{ e.stopPropagation(); toggleFU(f.id); }}
             style={{ width:18, height:18, borderRadius:"50%", flexShrink:0, marginTop:2, cursor:"pointer",
               border: f.done ? `1.5px solid ${th.accent}` : `1.5px solid ${th.border2}`,
               background: f.done ? th.accentBg : "transparent",
@@ -991,13 +993,13 @@ export default function CRM({ session }) {
               color: f.done ? th.text3 : th.warn }}>{f.date}</div>
             <div style={{ display:"flex", gap:6 }}>
               <button
-                onClick={()=>setEditingFU(isEditing ? null : f.id)}
+                onClick={e=>{ e.stopPropagation(); setEditingFU(isEditing ? null : f.id); }}
                 style={{ ...s.btnGhost, padding:"3px 9px", fontSize:11,
                   color: isEditing ? th.accent : th.text2,
                   borderColor: isEditing ? th.accent : th.border }}>
                 {isEditing ? t.followups.cancel : t.followups.edit}
               </button>
-              <button onClick={()=>{ if(window.confirm(t.followups.confirmDelete)) deleteFU(f.id); }}
+              <button onClick={e=>{ e.stopPropagation(); if(window.confirm(t.followups.confirmDelete)) deleteFU(f.id); }}
                 style={{ ...s.btnGhost, padding:"3px 9px", fontSize:11, color:th.danger, borderColor:th.dangerBg }}>
                 {t.followups.delete}
               </button>
