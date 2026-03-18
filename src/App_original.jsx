@@ -376,8 +376,6 @@ export default function CRM({ session }) {
   const [filterStatus, setFilterStatus] = useState("All");
   const [search, setSearch]             = useState("");
   const [showAddLead, setShowAddLead]   = useState(false);
-  const [showEditLead, setShowEditLead] = useState(false);
-  const [editLead, setEditLead]         = useState(null);
   const [editNote, setEditNote]         = useState("");
   const [newLead, setNewLead]           = useState({ name:"",phone:"",email:"",status:"New Lead",product:"Term Life",age:"",city:"",notes:"" });
 
@@ -398,60 +396,6 @@ export default function CRM({ session }) {
   const [dCalls, setDCalls]       = useState([]);
   const [dLog, setDLog]           = useState([]);
   const [connId, setConnId]       = useState(null);
-
-  // ── Bulk selection ──
-  const [selectedIds, setSelectedIds] = useState(new Set());
-  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
-
-  const toggleSelect = (id, e) => {
-    e.stopPropagation();
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
-  const toggleSelectAll = (rows) => {
-    if (selectedIds.size === rows.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(rows.map(l => l.id)));
-    }
-  };
-  const clearSelection = () => setSelectedIds(new Set());
-
-  const handleBulkDelete = async () => {
-    const ids = [...selectedIds];
-    setLeads(p => p.filter(l => !selectedIds.has(l.id)));
-    setSelectedIds(new Set());
-    setShowBulkDeleteConfirm(false);
-    try {
-      for (const id of ids) {
-        await fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/leads?id=eq.${id}`, {
-          method: "DELETE",
-          headers: {
-            "apikey": import.meta.env.VITE_SUPABASE_ANON_KEY,
-            "Authorization": "Bearer " + import.meta.env.VITE_SUPABASE_ANON_KEY,
-          }
-        });
-      }
-    } catch(e) { console.error(e); }
-  };
-
-  const handleExportCSV = (leadsToExport) => {
-    const headers = ["Nombre","Telefono","Email","Status","Producto","Prima","Ciudad","Ultimo Contacto","Notas"];
-    const rows = leadsToExport.map(l =>
-      [l.name, l.phone, l.email, l.status, l.product, l.premium, l.city, l.lastContact, l.notes]
-        .map(v => `"${(v||"").toString().replace(/"/g,"\"")}"`));
-    const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `lifedesk-leads-${new Date().toISOString().split("T")[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
 
   // ── CSV ──
   const [csvModal, setCsvModal]   = useState(false);
@@ -686,12 +630,8 @@ export default function CRM({ session }) {
             const count=leads.filter(l=>l.status===st).length;
             const pct=leads.length?count/leads.length:0;
             return (
-              <div key={st} onClick={()=>{ setFilterStatus(st); setView("leads"); }}
-              style={{ display:"flex", alignItems:"center", gap:14, padding:"11px 18px",
-                borderBottom:i<STATUSES.length-1?`1px solid ${th.border}`:"none",
-                cursor:"pointer" }}
-              onMouseEnter={e=>e.currentTarget.style.background=th.s2}
-              onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+              <div key={st} style={{ display:"flex", alignItems:"center", gap:14, padding:"11px 18px",
+                borderBottom:i<STATUSES.length-1?`1px solid ${th.border}`:"none" }}>
                 <StatusDot status={st} size={6} />
                 <span style={{ fontSize:13, color:th.text2, flex:1, fontWeight:500 }}>{t.status[st]||st}</span>
                 <div style={{ width:120, height:4, background:th.s3, borderRadius:2, overflow:"hidden" }}>
@@ -710,47 +650,17 @@ export default function CRM({ session }) {
         {fus.filter(f=>!f.done).slice(0,4).map(f=>{
           const lead=leads.find(l=>l.id===f.leadId);
           return (
-            <div key={f.id} style={{ ...s.card, padding:"12px 16px", marginBottom:8, display:"flex", alignItems:"center", gap:14, cursor:"pointer" }}
-              onClick={()=>{ if(lead){ setSelectedLead(lead); setEditNote(lead.notes); setView("leadDetail"); } }}>
+            <div key={f.id} style={{ ...s.card, padding:"12px 16px", marginBottom:8, display:"flex", alignItems:"center", gap:14 }}>
               <div style={{ flex:1 }}>
                 <span style={{ fontWeight:600, color:th.text, fontSize:13 }}>{lead?.name}</span>
                 <span style={{ color:th.text3, fontSize:12, marginLeft:8, fontFamily:"'JetBrains Mono',monospace" }}>{f.date}</span>
                 <div style={{ color:th.text2, fontSize:12, marginTop:3 }}>{f.note}</div>
               </div>
-              <button onClick={e=>{ e.stopPropagation(); toggleFU(f.id); }} style={{ ...s.btnGhost }}>{t.dash.done}</button>
+              <button onClick={()=>toggleFU(f.id)} style={{ ...s.btnGhost }}>{t.dash.done}</button>
             </div>
           );
         })}
         {fus.filter(f=>!f.done).length===0&&<div style={{ color:th.text3, fontSize:13 }}>{t.dash.noFollowups}</div>}
-      </div>
-
-      {/* Workspaces */}
-      <div style={{ marginTop:28 }}>
-        <div style={{ fontSize:11, fontWeight:600, color:th.text3, letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:12 }}>
-          Workspaces {workspaces.length > 0 ? `(${workspaces.length})` : ""}
-        </div>
-        {workspaces.length > 0 && (
-          <div style={{ ...s.card, overflow:"hidden" }}>
-            {workspaces.map((ws, i) => (
-              <div key={ws.id}
-                onClick={() => { setActiveWorkspace(ws); loadWsLeads(ws); setView("workspace"); }}
-                style={{ display:"flex", alignItems:"center", gap:14, padding:"11px 18px",
-                  borderBottom: i < workspaces.length-1 ? `1px solid ${th.border}` : "none",
-                  cursor:"pointer" }}
-                onMouseEnter={e=>e.currentTarget.style.background=th.s2}
-                onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                <span style={{ width:8, height:8, borderRadius:"50%", background:ws.color, flexShrink:0, display:"inline-block" }} />
-                <span style={{ fontSize:13, color:th.text2, flex:1, fontWeight:500 }}>{ws.name}</span>
-                <span style={{ fontSize:10, color:th.text3, background:th.s2, padding:"2px 8px", borderRadius:20, marginRight:4 }}>⇄ compartido</span>
-                <span style={{ fontSize:12, color:th.text3, fontFamily:"'JetBrains Mono',monospace" }}>{ws.invite_code}</span>
-              </div>
-            ))}
-          </div>
-        )}
-        <div style={{ display:"flex", gap:8, marginTop:10 }}>
-          <button onClick={()=>setShowCreateWs(true)} style={{ ...s.btnGhost, fontSize:12 }}>+ Crear workspace</button>
-          <button onClick={()=>setShowJoinWs(true)} style={{ ...s.btnGhost, fontSize:12 }}>↗ Unirse</button>
-        </div>
       </div>
     </div>
   );
@@ -772,28 +682,6 @@ export default function CRM({ session }) {
 
       {csvErr&&<div style={{ background:th.dangerBg, color:th.danger, borderRadius:7, padding:"8px 12px", marginBottom:12, fontSize:12 }}>{csvErr}</div>}
 
-      {selectedIds.size>0&&(
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 14px", marginBottom:12,
-          background:th.accentBg, border:`1px solid ${th.accentBd}`, borderRadius:8 }}>
-          <span style={{ fontSize:13, fontWeight:600, color:th.accent }}>
-            {selectedIds.size} seleccionado{selectedIds.size!==1?"s":""}
-          </span>
-          <div style={{ display:"flex", gap:8 }}>
-            <button style={{ ...s.btnGhost, fontSize:12, padding:"4px 12px", color:th.accent, borderColor:th.accentBd }}
-              onClick={()=>handleExportCSV(leads.filter(l=>selectedIds.has(l.id)))}>
-              ↓ Exportar CSV
-            </button>
-            <button style={{ ...s.btnGhost, fontSize:12, padding:"4px 12px", color:th.danger, borderColor:th.dangerBg }}
-              onClick={()=>setShowBulkDeleteConfirm(true)}>
-              🗑 Eliminar
-            </button>
-            <button style={{ ...s.btnGhost, fontSize:12, padding:"4px 12px" }} onClick={clearSelection}>
-              Cancelar
-            </button>
-          </div>
-        </div>
-      )}
-
       <div style={{ display:"flex", gap:8, marginBottom:16 }}>
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder={t.leads.search}
           style={{ ...s.inp, maxWidth:300, flex:1 }} />
@@ -808,11 +696,6 @@ export default function CRM({ session }) {
         <table style={{ width:"100%", borderCollapse:"collapse" }}>
           <thead>
             <tr style={{ borderBottom:`1px solid ${th.border}` }}>
-              <th style={{ padding:"10px 16px", width:40, textAlign:"center" }}>
-                <input type="checkbox" style={{ cursor:"pointer", accentColor:th.accent }}
-                  checked={filtLeads.length>0&&selectedIds.size===filtLeads.length}
-                  onChange={()=>toggleSelectAll(filtLeads)} />
-              </th>
               {[t.leads.name,t.leads.phone,t.leads.city,t.leads.product,t.leads.status,t.leads.lastContact,""].map(h=>(
                 <th key={h} style={{ padding:"10px 16px", textAlign:"left", fontSize:10, fontWeight:700, color:th.text3, letterSpacing:"0.08em", textTransform:"uppercase" }}>{h}</th>
               ))}
@@ -820,17 +703,9 @@ export default function CRM({ session }) {
           </thead>
           <tbody>
             {filtLeads.map((l,i)=>(
-              <tr key={l.id} style={{ borderBottom:i<filtLeads.length-1?`1px solid ${th.border}`:"none", cursor:"pointer",
-                  background:selectedIds.has(l.id)?th.accentBg:"transparent" }}
-                onClick={()=>{setSelectedLead(l);setEditNote(l.notes);setView("leadDetail");}}
-                onMouseEnter={e=>{ if(!selectedIds.has(l.id)) e.currentTarget.style.background=th.s2; }}
-                onMouseLeave={e=>{ if(!selectedIds.has(l.id)) e.currentTarget.style.background="transparent"; }}>
-                <td style={{ padding:"11px 16px", textAlign:"center", width:40 }}>
-                  <input type="checkbox" style={{ cursor:"pointer", accentColor:th.accent }}
-                    checked={selectedIds.has(l.id)}
-                    onChange={e=>toggleSelect(l.id, e)}
-                    onClick={e=>e.stopPropagation()} />
-                </td>
+              <tr key={l.id} style={{ borderBottom:i<filtLeads.length-1?`1px solid ${th.border}`:"none", cursor:"default" }}
+                onMouseEnter={e=>e.currentTarget.style.background=th.s2}
+                onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                 <td style={{ padding:"11px 16px" }}>
                   <div style={{ fontWeight:600, fontSize:13, color:th.text }}>{l.name}</div>
                   <div style={{ fontSize:11, color:th.text3 }}>{l.email}</div>
@@ -869,10 +744,7 @@ export default function CRM({ session }) {
                 <div style={{ fontSize:13, color:th.text3, fontFamily:"'JetBrains Mono',monospace" }}>{selectedLead.phone} · {selectedLead.email}</div>
                 <div style={{ fontSize:13, color:th.text3, marginTop:2 }}>{selectedLead.city}{selectedLead.age?` · ${selectedLead.age}y`:""}</div>
               </div>
-              <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:8 }}>
-                <StatusDot status={selectedLead.status} label={<span style={{ fontSize:13, color:th.text2, fontWeight:600 }}>{t.status[selectedLead.status]||selectedLead.status}</span>} />
-                <button onClick={()=>setShowEditLead(true)} style={{ ...s.btnGhost, fontSize:12 }}>✎ Editar</button>
-              </div>
+              <StatusDot status={selectedLead.status} label={<span style={{ fontSize:13, color:th.text2, fontWeight:600 }}>{t.status[selectedLead.status]||selectedLead.status}</span>} />
             </div>
             <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10 }}>
               {[[t.leads.detail.product,selectedLead.product],[t.leads.detail.premium,selectedLead.premium?`$${selectedLead.premium}`:"—"],[t.leads.detail.lastContact,selectedLead.lastContact]].map(([k,v])=>(
@@ -897,7 +769,7 @@ export default function CRM({ session }) {
             <div style={{ fontSize:11, color:th.text3, fontWeight:600, letterSpacing:"0.06em", textTransform:"uppercase", marginBottom:14 }}>{t.leads.detail.changeStatus}</div>
             {STATUSES.map(st=>(
               <button key={st} onClick={()=>setLeadStatus(selectedLead.id,st)}
-                style={{ display:"flex", alignItems:"center", gap:8, width:"100%",
+                style={{ display:"flex", alignItems:"center", gap:8, width:"100%", background:"transparent",
                   border:"none", padding:"8px 6px", cursor:"pointer", borderRadius:6,
                   background:selectedLead.status===st?th.s2:"transparent" }}
                 onMouseEnter={e=>e.currentTarget.style.background=th.s2}
@@ -997,9 +869,8 @@ export default function CRM({ session }) {
     return (
       <div style={{ ...s.card, marginBottom:8, overflow:"hidden", opacity: dimmed&&!isEditing ? 0.55 : 1 }}>
         {/* Row */}
-        <div style={{ padding:"13px 16px", display:"flex", alignItems:"flex-start", gap:12, cursor:"pointer" }}
-          onClick={()=>{ if(lead){ setSelectedLead(lead); setEditNote(lead.notes); setView("leadDetail"); } }}>
-          <button onClick={e=>{ e.stopPropagation(); toggleFU(f.id); }}
+        <div style={{ padding:"13px 16px", display:"flex", alignItems:"flex-start", gap:12 }}>
+          <button onClick={()=>toggleFU(f.id)}
             style={{ width:18, height:18, borderRadius:"50%", flexShrink:0, marginTop:2, cursor:"pointer",
               border: f.done ? `1.5px solid ${th.accent}` : `1.5px solid ${th.border2}`,
               background: f.done ? th.accentBg : "transparent",
@@ -1022,13 +893,13 @@ export default function CRM({ session }) {
               color: f.done ? th.text3 : th.warn }}>{f.date}</div>
             <div style={{ display:"flex", gap:6 }}>
               <button
-                onClick={e=>{ e.stopPropagation(); setEditingFU(isEditing ? null : f.id); }}
+                onClick={()=>setEditingFU(isEditing ? null : f.id)}
                 style={{ ...s.btnGhost, padding:"3px 9px", fontSize:11,
                   color: isEditing ? th.accent : th.text2,
                   borderColor: isEditing ? th.accent : th.border }}>
                 {isEditing ? t.followups.cancel : t.followups.edit}
               </button>
-              <button onClick={e=>{ e.stopPropagation(); if(window.confirm(t.followups.confirmDelete)) deleteFU(f.id); }}
+              <button onClick={()=>{ if(window.confirm(t.followups.confirmDelete)) deleteFU(f.id); }}
                 style={{ ...s.btnGhost, padding:"3px 9px", fontSize:11, color:th.danger, borderColor:th.dangerBg }}>
                 {t.followups.delete}
               </button>
@@ -1330,72 +1201,6 @@ export default function CRM({ session }) {
     </div>
   );
 
-  // ─── Modal: Edit Lead ────────────────────────────────────────────────────────
-  const ModalEditLead = showEditLead&&selectedLead&&(
-    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:60, padding:16 }}>
-      <div style={{ ...s.card, padding:26, width:440, maxWidth:"94vw" }}>
-        <h3 style={{ fontWeight:700, fontSize:16, marginBottom:20, color:th.text, letterSpacing:"-0.02em" }}>Editar Lead</h3>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
-          {[["Nombre *","name","text"],["Teléfono","phone","tel"],["Email","email","email"],["Ciudad","city","text"],["Edad","age","number"]].map(([label,field,type])=>(
-            <div key={field}>
-              <span style={s.label}>{label}</span>
-              <input type={type} defaultValue={selectedLead[field]}
-                onChange={e=>setEditLead(p=>({...(p||selectedLead),[field]:e.target.value}))}
-                style={s.inp} />
-            </div>
-          ))}
-          <div>
-            <span style={s.label}>Status</span>
-            <select defaultValue={selectedLead.status}
-              onChange={e=>setEditLead(p=>({...(p||selectedLead),status:e.target.value}))}
-              style={s.inp}>
-              {STATUSES.map(st=><option key={st} value={st}>{t.status[st]||st}</option>)}
-            </select>
-          </div>
-          <div>
-            <span style={s.label}>Producto</span>
-            <select defaultValue={selectedLead.product}
-              onChange={e=>setEditLead(p=>({...(p||selectedLead),product:e.target.value}))}
-              style={s.inp}>
-              {EN_PRODUCTS.map(p=><option key={p} value={p}>{p}</option>)}
-            </select>
-          </div>
-          <div>
-            <span style={s.label}>Prima/mes ($)</span>
-            <input type="number" defaultValue={selectedLead.premium}
-              onChange={e=>setEditLead(p=>({...(p||selectedLead),premium:parseFloat(e.target.value)||0}))}
-              style={s.inp} />
-          </div>
-          <div>
-            <span style={s.label}>Último contacto</span>
-            <input type="date" defaultValue={selectedLead.lastContact}
-              onChange={e=>setEditLead(p=>({...(p||selectedLead),lastContact:e.target.value}))}
-              style={s.inp} />
-          </div>
-        </div>
-        <div style={{ marginTop:12 }}>
-          <span style={s.label}>Notas</span>
-          <textarea defaultValue={selectedLead.notes} rows={3}
-            onChange={e=>setEditLead(p=>({...(p||selectedLead),notes:e.target.value}))}
-            style={{ ...s.inp, resize:"vertical" }} />
-        </div>
-        <div style={{ display:"flex", gap:8, marginTop:18, justifyContent:"flex-end" }}>
-          <button onClick={()=>{ setShowEditLead(false); setEditLead(null); }} style={s.btnGhost}>Cancelar</button>
-          <button onClick={async()=>{
-            const data = editLead || selectedLead;
-            const updated = { name:data.name, phone:data.phone, email:data.email,
-              city:data.city, age:data.age, status:data.status, product:data.product,
-              premium:data.premium, notes:data.notes, last_contact:data.lastContact };
-            setLeads(p=>p.map(l=>l.id===selectedLead.id?{...l,...data}:l));
-            setSelectedLead(p=>({...p,...data}));
-            setShowEditLead(false); setEditLead(null);
-            try { await updateLead(selectedLead.id, updated); } catch(e){ console.error(e); }
-          }} style={s.btn}>Guardar</button>
-        </div>
-      </div>
-    </div>
-  );
-
   // ─── Modal: Add Follow-up ─────────────────────────────────────────────────
   const ModalAddFU = showAddFU&&(
     <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:60, padding:16 }}>
@@ -1596,25 +1401,8 @@ export default function CRM({ session }) {
 
       {/* Modals */}
       {ModalAddLead}
-      {ModalEditLead}
       {ModalAddFU}
       {ModalCSV}
-      {showBulkDeleteConfirm&&(
-        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:60, padding:16 }}>
-          <div style={{ ...s.card, padding:26, width:380, maxWidth:"94vw" }}>
-            <h3 style={{ fontWeight:700, fontSize:16, marginBottom:12, color:th.text }}>Eliminar leads</h3>
-            <p style={{ color:th.text2, fontSize:13, marginBottom:20 }}>
-              ¿Eliminar <strong>{selectedIds.size} leads</strong>? Esta acción no se puede deshacer.
-            </p>
-            <div style={{ display:"flex", gap:8, justifyContent:"flex-end" }}>
-              <button onClick={()=>setShowBulkDeleteConfirm(false)} style={s.btnGhost}>Cancelar</button>
-              <button onClick={handleBulkDelete} style={{ ...s.btnDanger, fontWeight:700 }}>
-                Eliminar {selectedIds.size} leads
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

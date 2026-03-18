@@ -1,4 +1,3 @@
-// src/lib/supabase.js
 import { createClient } from '@supabase/supabase-js'
 
 const SUPABASE_URL      = import.meta.env.VITE_SUPABASE_URL
@@ -95,4 +94,86 @@ export async function logCall({ leadId, outcome, durationSec, fromNumber }) {
   }]).select().single()
   if (error) throw error
   return data
+}
+
+// ── Workspaces ────────────────────────────────────────────────────────────────
+
+export async function fetchWorkspaces() {
+  const { data, error } = await supabase
+    .from('workspaces').select('*').order('created_at', { ascending: true })
+  if (error) throw error
+  return data || []
+}
+
+export async function createWorkspace({ name, color }) {
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data, error } = await supabase.from('workspaces')
+    .insert([{ name, color, created_by: user.id }]).select().single()
+  if (error) throw error
+  // Auto-add creator as admin member
+  await supabase.from('workspace_members')
+    .insert([{ workspace_id: data.id, user_id: user.id, role: 'admin' }])
+  return data
+}
+
+export async function joinWorkspace(inviteCode) {
+  const { data: ws, error: wsErr } = await supabase
+    .from('workspaces').select('id').eq('invite_code', inviteCode.toUpperCase()).single()
+  if (wsErr) throw new Error('Código inválido')
+  const { data: { user } } = await supabase.auth.getUser()
+  const { error } = await supabase.from('workspace_members')
+    .insert([{ workspace_id: ws.id, user_id: user.id, role: 'member' }])
+  if (error && error.code !== '23505') throw error // ignore duplicate
+  return ws
+}
+
+export async function fetchWorkspaceMembers(workspaceId) {
+  const { data, error } = await supabase
+    .from('workspace_members').select('*').eq('workspace_id', workspaceId)
+  if (error) throw error
+  return data || []
+}
+
+export async function updateMemberRole(workspaceId, userId, role) {
+  const { error } = await supabase.from('workspace_members')
+    .update({ role }).eq('workspace_id', workspaceId).eq('user_id', userId)
+  if (error) throw error
+}
+
+export async function removeMember(workspaceId, userId) {
+  const { error } = await supabase.from('workspace_members')
+    .delete().eq('workspace_id', workspaceId).eq('user_id', userId)
+  if (error) throw error
+}
+
+export async function fetchWorkspaceLeads(workspaceId) {
+  const { data, error } = await supabase
+    .from('workspace_leads')
+    .select('lead_id, leads(*)')
+    .eq('workspace_id', workspaceId)
+  if (error) throw error
+  return (data || []).map(row => normLead(row.leads))
+}
+
+export async function addLeadsToWorkspace(workspaceId, leadIds) {
+  const { data: { user } } = await supabase.auth.getUser()
+  const rows = leadIds.map(lead_id => ({ workspace_id: workspaceId, lead_id, added_by: user.id }))
+  const { error } = await supabase.from('workspace_leads').insert(rows)
+  if (error && error.code !== '23505') throw error
+}
+
+export async function removeLeadFromWorkspace(workspaceId, leadId) {
+  const { error } = await supabase.from('workspace_leads')
+    .delete().eq('workspace_id', workspaceId).eq('lead_id', leadId)
+  if (error) throw error
+}
+
+export async function updateWorkspace(id, fields) {
+  const { error } = await supabase.from('workspaces').update(fields).eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteWorkspace(id) {
+  const { error } = await supabase.from('workspaces').delete().eq('id', id)
+  if (error) throw error
 }
