@@ -376,6 +376,8 @@ export default function CRM({ session }) {
   const [filterStatus, setFilterStatus] = useState("All");
   const [search, setSearch]             = useState("");
   const [showAddLead, setShowAddLead]   = useState(false);
+  const [showEditLead, setShowEditLead] = useState(false);
+  const [editLead, setEditLead]         = useState(null);
   const [editNote, setEditNote]         = useState("");
   const [newLead, setNewLead]           = useState({ name:"",phone:"",email:"",status:"New Lead",product:"Term Life",age:"",city:"",notes:"" });
 
@@ -684,8 +686,12 @@ export default function CRM({ session }) {
             const count=leads.filter(l=>l.status===st).length;
             const pct=leads.length?count/leads.length:0;
             return (
-              <div key={st} style={{ display:"flex", alignItems:"center", gap:14, padding:"11px 18px",
-                borderBottom:i<STATUSES.length-1?`1px solid ${th.border}`:"none" }}>
+              <div key={st} onClick={()=>{ setFilterStatus(st); setView("leads"); }}
+              style={{ display:"flex", alignItems:"center", gap:14, padding:"11px 18px",
+                borderBottom:i<STATUSES.length-1?`1px solid ${th.border}`:"none",
+                cursor:"pointer" }}
+              onMouseEnter={e=>e.currentTarget.style.background=th.s2}
+              onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                 <StatusDot status={st} size={6} />
                 <span style={{ fontSize:13, color:th.text2, flex:1, fontWeight:500 }}>{t.status[st]||st}</span>
                 <div style={{ width:120, height:4, background:th.s3, borderRadius:2, overflow:"hidden" }}>
@@ -833,7 +839,10 @@ export default function CRM({ session }) {
                 <div style={{ fontSize:13, color:th.text3, fontFamily:"'JetBrains Mono',monospace" }}>{selectedLead.phone} · {selectedLead.email}</div>
                 <div style={{ fontSize:13, color:th.text3, marginTop:2 }}>{selectedLead.city}{selectedLead.age?` · ${selectedLead.age}y`:""}</div>
               </div>
-              <StatusDot status={selectedLead.status} label={<span style={{ fontSize:13, color:th.text2, fontWeight:600 }}>{t.status[selectedLead.status]||selectedLead.status}</span>} />
+              <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:8 }}>
+                <StatusDot status={selectedLead.status} label={<span style={{ fontSize:13, color:th.text2, fontWeight:600 }}>{t.status[selectedLead.status]||selectedLead.status}</span>} />
+                <button onClick={()=>setShowEditLead(true)} style={{ ...s.btnGhost, fontSize:12 }}>✎ Editar</button>
+              </div>
             </div>
             <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10 }}>
               {[[t.leads.detail.product,selectedLead.product],[t.leads.detail.premium,selectedLead.premium?`$${selectedLead.premium}`:"—"],[t.leads.detail.lastContact,selectedLead.lastContact]].map(([k,v])=>(
@@ -1290,6 +1299,72 @@ export default function CRM({ session }) {
     </div>
   );
 
+  // ─── Modal: Edit Lead ────────────────────────────────────────────────────────
+  const ModalEditLead = showEditLead&&selectedLead&&(
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:60, padding:16 }}>
+      <div style={{ ...s.card, padding:26, width:440, maxWidth:"94vw" }}>
+        <h3 style={{ fontWeight:700, fontSize:16, marginBottom:20, color:th.text, letterSpacing:"-0.02em" }}>Editar Lead</h3>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+          {[["Nombre *","name","text"],["Teléfono","phone","tel"],["Email","email","email"],["Ciudad","city","text"],["Edad","age","number"]].map(([label,field,type])=>(
+            <div key={field}>
+              <span style={s.label}>{label}</span>
+              <input type={type} defaultValue={selectedLead[field]}
+                onChange={e=>setEditLead(p=>({...(p||selectedLead),[field]:e.target.value}))}
+                style={s.inp} />
+            </div>
+          ))}
+          <div>
+            <span style={s.label}>Status</span>
+            <select defaultValue={selectedLead.status}
+              onChange={e=>setEditLead(p=>({...(p||selectedLead),status:e.target.value}))}
+              style={s.inp}>
+              {STATUSES.map(st=><option key={st} value={st}>{t.status[st]||st}</option>)}
+            </select>
+          </div>
+          <div>
+            <span style={s.label}>Producto</span>
+            <select defaultValue={selectedLead.product}
+              onChange={e=>setEditLead(p=>({...(p||selectedLead),product:e.target.value}))}
+              style={s.inp}>
+              {EN_PRODUCTS.map(p=><option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+          <div>
+            <span style={s.label}>Prima/mes ($)</span>
+            <input type="number" defaultValue={selectedLead.premium}
+              onChange={e=>setEditLead(p=>({...(p||selectedLead),premium:parseFloat(e.target.value)||0}))}
+              style={s.inp} />
+          </div>
+          <div>
+            <span style={s.label}>Último contacto</span>
+            <input type="date" defaultValue={selectedLead.lastContact}
+              onChange={e=>setEditLead(p=>({...(p||selectedLead),lastContact:e.target.value}))}
+              style={s.inp} />
+          </div>
+        </div>
+        <div style={{ marginTop:12 }}>
+          <span style={s.label}>Notas</span>
+          <textarea defaultValue={selectedLead.notes} rows={3}
+            onChange={e=>setEditLead(p=>({...(p||selectedLead),notes:e.target.value}))}
+            style={{ ...s.inp, resize:"vertical" }} />
+        </div>
+        <div style={{ display:"flex", gap:8, marginTop:18, justifyContent:"flex-end" }}>
+          <button onClick={()=>{ setShowEditLead(false); setEditLead(null); }} style={s.btnGhost}>Cancelar</button>
+          <button onClick={async()=>{
+            const data = editLead || selectedLead;
+            const updated = { name:data.name, phone:data.phone, email:data.email,
+              city:data.city, age:data.age, status:data.status, product:data.product,
+              premium:data.premium, notes:data.notes, last_contact:data.lastContact };
+            setLeads(p=>p.map(l=>l.id===selectedLead.id?{...l,...data}:l));
+            setSelectedLead(p=>({...p,...data}));
+            setShowEditLead(false); setEditLead(null);
+            try { await updateLead(selectedLead.id, updated); } catch(e){ console.error(e); }
+          }} style={s.btn}>Guardar</button>
+        </div>
+      </div>
+    </div>
+  );
+
   // ─── Modal: Add Follow-up ─────────────────────────────────────────────────
   const ModalAddFU = showAddFU&&(
     <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:60, padding:16 }}>
@@ -1490,6 +1565,7 @@ export default function CRM({ session }) {
 
       {/* Modals */}
       {ModalAddLead}
+      {ModalEditLead}
       {ModalAddFU}
       {ModalCSV}
       {showBulkDeleteConfirm&&(
