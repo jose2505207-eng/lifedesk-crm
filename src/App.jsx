@@ -784,8 +784,9 @@ export default function CRM({ session }) {
           </thead>
           <tbody>
             {filtLeads.map((l,i)=>(
-              <tr key={l.id} style={{ borderBottom:i<filtLeads.length-1?`1px solid ${th.border}`:"none", cursor:"default",
+              <tr key={l.id} style={{ borderBottom:i<filtLeads.length-1?`1px solid ${th.border}`:"none", cursor:"pointer",
                   background:selectedIds.has(l.id)?th.accentBg:"transparent" }}
+                onClick={()=>{setSelectedLead(l);setEditNote(l.notes);setView("leadDetail");}}
                 onMouseEnter={e=>{ if(!selectedIds.has(l.id)) e.currentTarget.style.background=th.s2; }}
                 onMouseLeave={e=>{ if(!selectedIds.has(l.id)) e.currentTarget.style.background="transparent"; }}>
                 <td style={{ padding:"11px 16px", textAlign:"center", width:40 }}>
