@@ -1764,7 +1764,10 @@ export default function CRM({ session }) {
         {/* Workspace nav */}
         {wsNavItems.length > 0 && (
           <div style={{ padding:"8px 10px", borderTop:`1px solid ${th.border}`, marginTop:8 }}>
-            <div style={{ fontSize:10, color:th.text3, fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", padding:"6px 10px 4px" }}>Workspaces</div>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'6px 10px 4px' }}>
+              <span style={{ fontSize:10, color:th.text3, fontWeight:600, letterSpacing:'0.08em', textTransform:'uppercase' }}>Workspaces</span>
+              <button onClick={()=>setShowCreateWs(true)} style={{ background:'transparent', border:'none', color:th.accent, cursor:'pointer', fontSize:16, lineHeight:1 }}>+</button>
+            </div>
             {wsNavItems.map(item => (
               <button key={item.id}
                 onClick={()=>{ setActiveWorkspace(item.ws); loadWsLeads(item.ws); setView("workspace"); setSelectedLead(null); }}
