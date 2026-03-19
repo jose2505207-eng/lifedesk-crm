@@ -871,7 +871,7 @@ export default function CRM({ session }) {
           <thead>
             <tr style={{ borderBottom:`1px solid ${th.border}` }}>
               <th style={{ padding:"10px 16px", width:40, textAlign:"center" }}>
-                <input type="checkbox" style={{ cursor:"pointer", accentColor:th.accent }}
+                <input type="checkbox" style={{ cursor:"pointer", accentColor:th.accent, width:20, height:20 }}
                   checked={filtLeads.length>0&&selectedIds.size===filtLeads.length}
                   onChange={()=>toggleSelectAll(filtLeads)} />
               </th>
@@ -888,7 +888,7 @@ export default function CRM({ session }) {
                 onMouseEnter={e=>{ if(!selectedIds.has(l.id)) e.currentTarget.style.background=th.s2; }}
                 onMouseLeave={e=>{ if(!selectedIds.has(l.id)) e.currentTarget.style.background="transparent"; }}>
                 <td style={{ padding:"11px 16px", textAlign:"center", width:40 }}>
-                  <input type="checkbox" style={{ cursor:"pointer", accentColor:th.accent }}
+                  <input type="checkbox" style={{ cursor:"pointer", accentColor:th.accent, width:20, height:20 }}
                     checked={selectedIds.has(l.id)}
                     onChange={e=>toggleSelect(l.id, e)}
                     onClick={e=>e.stopPropagation()} />
