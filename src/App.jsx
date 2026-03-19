@@ -293,7 +293,7 @@ function StatusDot({ status, label, size=7 }) {
   return (
     <span style={{ display:"inline-flex", alignItems:"center", gap:5, whiteSpace:"nowrap" }}>
       <span style={{ width:size, height:size, borderRadius:"50%",
-        background:allStatusDots[status]||STATUS_DOT[status]||"#888", flexShrink:0, display:"inline-block" }} />
+        background:STATUS_DOT[status]||"#888", flexShrink:0, display:"inline-block" }} />
       {label && <span>{label}</span>}
     </span>
   );
