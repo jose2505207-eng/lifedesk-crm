@@ -92,12 +92,56 @@ lifedesk-crm/
 - [x] Dark/Light mode
 - [x] Español / English
 - [x] Importar CSV con preview
-- [ ] **Supabase — persistencia de datos** ← aquí estamos
-- [ ] Supabase Auth — login por agente
+- [x] Supabase — persistencia de datos
+- [x] Supabase Auth — login por agente
+- [x] RLS estricto — aislamiento de datos por agente (migración 002)
+- [x] Daily Digest — email diario de seguimientos (edge function `daily-digest`)
+- [x] Modo demo señalizado en Mass Text y Auto Dialer
 - [ ] Twilio SMS — envío masivo real
 - [ ] Twilio Conferences — marcador predictivo real
 - [ ] Vercel deploy
 - [ ] PWA / mobile
+
+---
+
+## Daily Digest (email diario de seguimientos)
+
+Cada mañana, cada agente recibe un email con sus follow-ups **de hoy** y los
+**vencidos**. Esto es lo que hace que el CRM le gane a una hoja de cálculo.
+
+### Setup (~10 minutos)
+
+1. Crea una cuenta gratis en [resend.com](https://resend.com) (100 emails/día gratis)
+   y verifica un dominio o usa el dominio de prueba `onboarding@resend.dev`
+2. Instala el CLI de Supabase y vincula tu proyecto:
+   ```
+   supabase link --project-ref TU_PROJECT_REF
+   ```
+3. Configura los secrets:
+   ```
+   supabase secrets set RESEND_API_KEY=re_xxxxx
+   supabase secrets set DIGEST_FROM="LifeDesk <digest@tudominio.com>"
+   ```
+4. Despliega la función:
+   ```
+   supabase functions deploy daily-digest --no-verify-jwt
+   ```
+5. Prográmala todos los días a las 8:00 AM (hora CA). En Supabase →
+   **SQL Editor**, con las extensiones `pg_cron` y `pg_net` habilitadas:
+   ```sql
+   select cron.schedule(
+     'lifedesk-daily-digest',
+     '0 15 * * *',  -- 15:00 UTC = 8:00 AM en California (PDT)
+     $$ select net.http_post(
+          url := 'https://TU_PROJECT_REF.supabase.co/functions/v1/daily-digest',
+          headers := '{"Content-Type": "application/json"}'::jsonb
+        ) $$
+   );
+   ```
+6. Prueba manual: `supabase functions invoke daily-digest`
+
+> ⚠️ Nota horaria: `pg_cron` corre en UTC. 15:00 UTC = 8 AM PDT (verano).
+> En invierno (PST) sería 16:00 UTC. Ajusta si te importa la hora exacta.
 
 ---
 

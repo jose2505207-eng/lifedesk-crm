@@ -55,12 +55,14 @@ const T = {
       msgLbl:"Message", msgHint:"Use {name} to personalize.",
       preview:"Preview", recipients:"Recipients",
       send:"Send to", contacts:"contact(s)",
-      sent:"✓ Sent to", compliance:"TCPA Compliance:",
+      sent:"✓ Simulated send to", compliance:"TCPA Compliance:",
+      demo:"DEMO MODE — No real text messages are sent. Twilio SMS integration coming soon.",
       complianceItems:["Prior written consent required","No texts 9pm–8am","Always include Reply STOP","Identify your name & agency"],
     },
     dialer: {
       title:"Auto Dialer", subtitle:"Call leads automatically using a local number matching their area code.",
       note:"Requires Twilio integration for live calls.",
+      demo:"DEMO MODE — Calls are simulated. No real calls are made and your lead data is not modified.",
       start:"▶ Start Dialer", stop:"⏹ Stop", config:"Configuration",
       concurrentCalls:"Concurrent Calls", filterLeads:"Filter Leads",
       allExcludeClosed:"All (excl. closed)", queued:"Queued",
@@ -132,12 +134,14 @@ const T = {
       msgLbl:"Mensaje", msgHint:"Usa {nombre} para personalizar.",
       preview:"Vista previa", recipients:"Destinatarios",
       send:"Enviar a", contacts:"contacto(s)",
-      sent:"✓ Enviado a", compliance:"Compliance TCPA + CA:",
+      sent:"✓ Envío simulado a", compliance:"Compliance TCPA + CA:",
+      demo:"MODO DEMO — No se envían mensajes reales. Integración Twilio SMS próximamente.",
       complianceItems:["Consentimiento escrito previo","No enviar 9pm–8am","Incluir 'Reply STOP'","Identificar tu nombre y agencia"],
     },
     dialer: {
       title:"Marcador Automático", subtitle:"Llama automáticamente usando un número local del mismo área del lead.",
       note:"Requiere integración Twilio para llamadas reales.",
+      demo:"MODO DEMO — Las llamadas son simuladas. No se realizan llamadas reales ni se modifican tus leads.",
       start:"▶ Iniciar", stop:"⏹ Detener", config:"Configuración",
       concurrentCalls:"Llamadas Simultáneas", filterLeads:"Filtrar Leads",
       allExcludeClosed:"Todos (excl. cerrados)", queued:"En cola",
@@ -663,11 +667,9 @@ export default function CRM({ session }) {
         if (answers){
           const answerer=prev[aIdx]; if(!answerer) return prev;
           setConnId(answerer.id);
-          setLeads(ls=>ls.map(l=>l.id===answerer.lead.id
-            ?{...l,status:l.status==="New Lead"?"Contacted":l.status,lastContact:new Date().toISOString().slice(0,10)}
-            :l));
-          // Persist to Supabase
-          updateLead(answerer.lead.id,{status:answerer.lead.status==="New Lead"?"Contacted":answerer.lead.status,last_contact:new Date().toISOString().slice(0,10)}).catch(console.error);
+          // DEMO MODE: visual simulation only — do NOT mutate real lead data
+          // or persist fake "Contacted" statuses to Supabase. Real persistence
+          // will be wired here with the Twilio integration.
           return prev.map((c,i)=>i===aIdx?{...c,state:"connected"}:{...c,state:"dropped"});
         } else {
           prev.forEach(c=>setDLog(lg=>[...lg,{...c,state:"no-answer",endedAt:Date.now()}]));
@@ -1283,6 +1285,9 @@ export default function CRM({ session }) {
   const SectionMassText = (
     <div>
       <h1 style={{ fontSize:22, fontWeight:700, color:th.text, marginBottom:6, letterSpacing:"-0.03em" }}>{t.massText.title}</h1>
+      <div style={{ background:"rgba(234,179,8,0.12)", border:"1px solid rgba(234,179,8,0.45)", color:"#b45309", borderRadius:8, padding:"8px 12px", fontSize:12, fontWeight:600, marginBottom:10 }}>
+        ⚠ {t.massText.demo}
+      </div>
       <p style={{ color:th.text3, fontSize:12, marginBottom:24 }}>{t.massText.disclaimer}</p>
       <div style={{ display:"grid", gridTemplateColumns:"1fr 300px", gap:16 }}>
         <div style={{ ...s.card, padding:22 }}>
@@ -1348,6 +1353,9 @@ export default function CRM({ session }) {
   // ─── Section: Auto Dialer ─────────────────────────────────────────────────
   const SectionDialer = (
     <div>
+      <div style={{ background:"rgba(234,179,8,0.12)", border:"1px solid rgba(234,179,8,0.45)", color:"#b45309", borderRadius:8, padding:"8px 12px", fontSize:12, fontWeight:600, marginBottom:14 }}>
+        ⚠ {t.dialer.demo}
+      </div>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:20 }}>
         <div>
           <h1 style={{ fontSize:22, fontWeight:700, color:th.text, letterSpacing:"-0.03em", marginBottom:4 }}>{t.dialer.title}</h1>
