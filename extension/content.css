@@ -1,0 +1,16 @@
+#lifedesk-banner {
+  position: fixed; top: 16px; right: 16px; z-index: 2147483647;
+  display: flex; align-items: center; gap: 14px;
+  background: #0f172a; color: #f8fafc; border: 1px solid #334155;
+  border-radius: 12px; padding: 10px 14px;
+  font: 13px/1.4 system-ui, -apple-system, sans-serif;
+  box-shadow: 0 8px 24px rgba(0,0,0,.35);
+}
+#lifedesk-banner .ld-row { display: flex; align-items: center; gap: 8px; }
+#lifedesk-banner .ld-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; flex: 0 0 auto; }
+#lifedesk-banner .ld-actions { display: flex; align-items: center; gap: 8px; }
+#lifedesk-banner button { font: inherit; cursor: pointer; border-radius: 8px; border: none; }
+#lifedesk-banner #ld-open { background: #22c55e; color: #052e16; font-weight: 600; padding: 6px 12px; }
+#lifedesk-banner #ld-open:hover { background: #16a34a; }
+#lifedesk-banner #ld-close { background: transparent; color: #94a3b8; padding: 6px 8px; }
+#lifedesk-banner #ld-close:hover { color: #f8fafc; }

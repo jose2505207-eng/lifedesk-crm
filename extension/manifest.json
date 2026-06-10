@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "LifeDesk Lead Capture",
+  "version": "0.1.0",
+  "description": "Detecta portales de aseguradoras y abre el formulario rápido de leads de LifeDesk en el panel lateral.",
+  "permissions": ["sidePanel", "storage"],
+  "host_permissions": [
+    "https://*.ethoslife.com/*",
+    "https://*.fglife.com/*",
+    "https://*.mutualofomaha.com/*",
+    "https://*.americanamicable.com/*",
+    "https://*.nationallife.com/*",
+    "https://*.aetnaseniorproducts.com/*",
+    "https://*.aetna.com/*",
+    "https://*.supabase.co/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "side_panel": { "default_path": "sidepanel.html" },
+  "action": { "default_title": "Abrir LifeDesk" },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.ethoslife.com/*",
+        "https://*.fglife.com/*",
+        "https://*.mutualofomaha.com/*",
+        "https://*.americanamicable.com/*",
+        "https://*.nationallife.com/*",
+        "https://*.aetnaseniorproducts.com/*",
+        "https://*.aetna.com/*"
+      ],
+      "js": ["config.js", "content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}
